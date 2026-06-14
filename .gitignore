@@ -1,3 +1,4 @@
+# Do not commit .env or other secrets
 *.venv
 .env
 __pycache__
