@@ -26,10 +26,10 @@ COPY . .
 USER appuser
 
 # Expose Flask port
-EXPOSE 5000
+EXPOSE 8080
 
 # Run Flask app with gunicorn
 # Set default port for Cloud Run
 ENV PORT=8080
 # Run Flask app with gunicorn binding to the PORT env var
-CMD ["gunicorn", "-b", "0.0.0.0:${PORT}", "app:app"]
+CMD gunicorn -b 0.0.0.0:${PORT} app:app

@@ -1,45 +1,127 @@
-# MacBook Cleanup Manager
+# macbook-cleanup
 
-A Python + web app to analyse and selectively clean storage-heavy areas on macOS.
+A lightweight Flask web app that scans your macOS Trash folder and returns a list of files with their sizes. It can run locally for personal use or be deployed to Google Cloud Run for remote access.
 
-## Setup
+---
+
+## 📋 Project Overview
+
+- **Language**: Python 3.12
+- **Framework**: Flask
+- **Key Features**:
+  - Scan macOS Trash and report file details.
+  - Optional `CLOUD_MODE` environment variable to disable local‑only AppleScript calls when running in the cloud.
+  - Dockerized for easy deployment.
+
+---
+
+## 🛠 Prerequisites
+
+- Python 3.12+ (if running locally)
+- `uv` or `pip` for dependency installation
+- Docker Desktop (or Docker Engine) for container builds
+- Google Cloud SDK (`gcloud`) logged in to your GCP project
+- A GCP project with **Artifact Registry** and **Cloud Run** enabled
+
+---
+
+## ⚙️ Local Development
 
 ```bash
-# 1. Install dependencies
-pip3 install -r requirements.txt
+# Clone the repo (if you haven't already)
+git clone https://github.com/sridhar5bfttl/macbook-cleanup.git
+cd macbook-cleanup
 
-# 2. Run the server
-python3 app.py
+# Create a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+
+# Run the app
+export CLOUD_MODE=0   # optional – default is local mode
+python app.py
 ```
 
-Then open **http://127.0.0.1:5000** in your browser.
+Visit `http://127.0.0.1:5000/` in your browser and use the endpoint:
+`GET /api/category-files/trash` to see the JSON list of files in your Trash.
 
-## What it cleans
+---
 
-| Category | Path |
-|---|---|
-| Docker | `docker system prune -af --volumes` |
-| Ollama models | `~/.ollama/models` |
-| Xcode DerivedData | `~/Library/Developer/Xcode/DerivedData` |
-| UTM VMs | `~/Library/Containers/com.utmapp.UTM/…` |
-| Parallels VMs | `~/Parallels` |
-| Downloads | `~/Downloads` |
-| Library Caches | `~/Library/Caches` |
-| VS Code cache | Logs, CachedData, CachedExtensionVSIXs |
-| Gemini cache | `~/Library/Caches/com.google.Gemini` |
-| Antigravity cache | `~/Library/Caches/Antigravity` |
-| Trash | `~/.Trash` (via Finder AppleScript) |
-| Temp files | `/private/tmp` |
+## 📦 Docker Build & Run
 
-## Safety
+```bash
+# Build the image (replace <PROJECT_ID> with your GCP project ID)
+export PROJECT_ID=$(gcloud config get-value project)
+docker build -t $PROJECT_ID/macbook-cleanup:latest .
 
-- Nothing is deleted until you explicitly select items and click **Clean selected**
-- A confirmation modal lists exactly what will be deleted before anything happens
-- Items with irreversible consequences (VMs, Ollama models, Downloads) are flagged with a ⚠️ warning
+# Test locally
+docker run -e CLOUD_MODE=0 -p 8080:8080 $PROJECT_ID/macbook-cleanup:latest
+# Open http://localhost:8080/ in the browser
+```
 
-## API
+The Dockerfile is set up to use `gunicorn` and respects the `$PORT` environment variable that Cloud Run provides.
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `GET /api/scan` | GET | Scans all categories, returns sizes in bytes |
-| `POST /api/clean` | POST | Cleans selected IDs. Body: `{"ids": ["docker", "trash", ...]}` |
+---
+
+## 🚀 Deploy to Google Cloud Run
+
+```bash
+# Authenticate Docker to push to Artifact Registry
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+# Tag and push the image to Artifact Registry
+docker tag $PROJECT_ID/macbook-cleanup:latest us-central1-docker.pkg.dev/$PROJECT_ID/macbook-cleanup-repo/macbook-cleanup:latest
+docker push us-central1-docker.pkg.dev/$PROJECT_ID/macbook-cleanup-repo/macbook-cleanup:latest
+
+# Deploy the container to Cloud Run
+gcloud run deploy macbook-cleanup \
+  --image us-central1-docker.pkg.dev/$PROJECT_ID/macbook-cleanup-repo/macbook-cleanup:latest \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars CLOUD_MODE=1
+```
+
+After deployment, Cloud Run will give you a URL (e.g., `https://macbook-cleanup-xxxxx-uc.a.run.app`). Use the same `/api/category-files/trash` endpoint to query the service.
+
+---
+
+## 🔄 Updating Code & Redeploying
+
+1. Make changes locally (e.g., add new endpoints or tweak the UI).
+2. Test the changes:
+   ```bash
+   python app.py   # or run the Docker container locally
+   ```
+3. Re‑build and push the image:
+   ```bash
+   docker build -t $PROJECT_ID/macbook-cleanup:latest .
+   docker push us-central1-docker.pkg.dev/$PROJECT_ID/macbook-cleanup-repo/macbook-cleanup:latest
+   ```
+4. Deploy the new image:
+   ```bash
+   gcloud run deploy macbook-cleanup \
+     --image us-central1-docker.pkg.dev/$PROJECT_ID/macbook-cleanup-repo/macbook-cleanup:latest \
+     --platform managed --region us-central1 --allow-unauthenticated
+   ```
+
+Cloud Run will spin up the new revision instantly; the old revision remains available for rollback.
+
+---
+
+## 🔐 Secrets & .env
+
+- The `.env` file is **git‑ignored** (see `.gitignore`).
+- Store any API keys or secrets in Cloud Run’s **environment variables** or use **Secret Manager** and reference them with `--set-secrets` during deployment.
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License – see the LICENSE file for details.
+
+---
+
+*Happy cleaning!*
