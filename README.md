@@ -59,6 +59,10 @@ docker build -t $PROJECT_ID/macbook-cleanup:latest .
 # Test locally
 docker run -e CLOUD_MODE=0 -p 8080:8080 $PROJECT_ID/macbook-cleanup:latest
 # Open http://localhost:8080/ in the browser
+
+# To run on a different port: 
+CLOUD_MODE=0 flask --app app run --host 0.0.0.0 --port 5005
+# Open http://localhost:5005/ in the browser
 ```
 
 The Dockerfile is set up to use `gunicorn` and respects the `$PORT` environment variable that Cloud Run provides.
